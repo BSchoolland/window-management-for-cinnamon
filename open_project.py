@@ -35,6 +35,66 @@ def ensure_workspace_exists(workspace_number):
         print(f"Failed to ensure workspace exists: {e}")
         return False
 
+def get_windows_by_workspace():
+    """Get a dictionary of windows organized by workspace"""
+    windows_by_workspace = {}
+    
+    try:
+        window_list = run_command("wmctrl -l")
+        for line in window_list.split('\n'):
+            if not line.strip():
+                continue
+                
+            parts = line.split(None, 3)
+            if len(parts) >= 3:
+                window_id = parts[0]
+                workspace_num = int(parts[1])
+                window_title = parts[3] if len(parts) > 3 else ""
+                
+                if workspace_num not in windows_by_workspace:
+                    windows_by_workspace[workspace_num] = []
+                    
+                windows_by_workspace[workspace_num].append({
+                    'id': window_id,
+                    'title': window_title
+                })
+    except Exception as e:
+        print(f"Error getting windows: {e}")
+    
+    return windows_by_workspace
+
+def check_workspaces_have_windows(start_ws=2, end_ws=5):
+    """Check if workspaces in the given range have any windows"""
+    windows_by_workspace = get_windows_by_workspace()
+    
+    has_windows = False
+    window_count = 0
+    
+    for ws in range(start_ws, end_ws + 1):
+        if ws in windows_by_workspace and windows_by_workspace[ws]:
+            has_windows = True
+            window_count += len(windows_by_workspace[ws])
+    
+    return has_windows, window_count, windows_by_workspace
+
+def close_windows_in_workspaces(start_ws=2, end_ws=5):
+    """Close all windows in the specified workspace range"""
+    windows_by_workspace = get_windows_by_workspace()
+    
+    closed_count = 0
+    for ws in range(start_ws, end_ws + 1):
+        if ws in windows_by_workspace:
+            for window in windows_by_workspace[ws]:
+                try:
+                    # Close the window gracefully
+                    run_command(f"wmctrl -ic {window['id']}")
+                    closed_count += 1
+                    time.sleep(0.2)  # Give the window time to close
+                except Exception as e:
+                    print(f"Error closing window {window['id']}: {e}")
+    
+    return closed_count
+
 def wait_for_new_window(initial_windows, max_attempts=20):
     """Wait for a new window to appear, returns set of new window IDs"""
     for attempt in range(max_attempts):
@@ -176,6 +236,22 @@ def open_project(project_data):
         print(f"Error: Project directory not found: {project_path}")
         return False
     
+    # Check for existing windows in workspaces 2-5
+    has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
+    
+
+    if has_windows:
+        print(f"Found {window_count} windows in workspaces 2-5.")
+        response = input("Close these windows and continue? (y/Enter to confirm, any other key to exit): ")
+        
+        if response.lower() != 'y' and response != '':
+            print("Operation cancelled by user.")
+            return False
+        run_command("xdotool key alt+F1")
+        # Close windows in workspaces 2-5
+        closed = close_windows_in_workspaces(2, 5)
+        print(f"Closed {closed} windows.")
+    # automatically press "alt-f1" to open workspace view
     # Get workspace configurations or use defaults
     config = project_data.get('workspace_config', {})
     cursor_ws = config.get('cursor_workspace', 1)
@@ -186,7 +262,7 @@ def open_project(project_data):
     # Get URL configurations or use defaults
     github_url = config.get('github_url', project_data.get('url', '').replace('.git', '') + '/issues')
     localhost_url = config.get('localhost_url', 'http://localhost:3000')
-    chat_url = config.get('chat_url', 'https://chat.openai.com')
+    chat_url = config.get('chat_url', 'https://chat.com')
     
     # Ensure we have all necessary workspaces
     max_workspace = max(cursor_ws, github_ws, localhost_ws, chat_ws)
@@ -195,8 +271,8 @@ def open_project(project_data):
     success = True
     
     # Launch Cursor in workspace 1
-    print(f"Opening project in Cursor at workspace {cursor_ws}...")
-    cursor_cmd = f"cursor {project_path}"
+    print(f"Opening project in Cursor at workspace {cursor_ws} with nohup...")
+    cursor_cmd = f"nohup cursor {project_path} > /dev/null 2>&1 & disown"
     if not run_and_move_window(cursor_cmd, cursor_ws):
         success = False
         print("Failed to open Cursor, continuing with other applications...")
@@ -204,7 +280,7 @@ def open_project(project_data):
     # Launch GitHub Issues in workspace 2
     if github_url:
         print(f"Opening GitHub Issues at workspace {github_ws}...")
-        github_cmd = f"google-chrome --new-window {github_url}"
+        github_cmd = f"nohup google-chrome --new-window {github_url} > /dev/null 2>&1 & disown"
         if not run_and_move_window(github_cmd, github_ws):
             success = False
             print("Failed to open GitHub Issues, continuing with other applications...")
@@ -212,7 +288,7 @@ def open_project(project_data):
     # Launch localhost in workspace 3
     if localhost_url:
         print(f"Opening localhost at workspace {localhost_ws}...")
-        localhost_cmd = f"google-chrome --new-window {localhost_url}"
+        localhost_cmd = f"nohup google-chrome --new-window {localhost_url} > /dev/null 2>&1 & disown"
         if not run_and_move_window(localhost_cmd, localhost_ws):
             success = False
             print("Failed to open localhost, continuing with other applications...")
@@ -220,16 +296,16 @@ def open_project(project_data):
     # Launch chat in workspace 4
     if chat_url:
         print(f"Opening chat at workspace {chat_ws}...")
-        chat_cmd = f"google-chrome --new-window {chat_url}"
+        chat_cmd = f"nohup google-chrome --new-window {chat_url} > /dev/null 2>&1 & disown"
         if not run_and_move_window(chat_cmd, chat_ws):
             success = False
             print("Failed to open chat, continuing with other applications...")
-    
+    run_command("xdotool key 2")
     return success
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Open a project from the projects directory')
-    parser.add_argument('query', nargs='?', default='', help='Partial name of the project to open')
+    parser.add_argument('query', nargs='?', default='', help='Name or Partial name of the project to open') 
     args = parser.parse_args()
     
     if not args.query:
