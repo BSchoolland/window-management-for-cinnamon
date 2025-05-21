@@ -246,6 +246,8 @@ def open_project(project_data):
         if response.lower() != 'y' and response != '':
             print("Operation cancelled by user.")
             return False
+        # wait for 0.2 seconds for input to end
+        time.sleep(0.2)
         run_command("xdotool key alt+F1")
         # Close windows in workspaces 2-5
         closed = close_windows_in_workspaces(2, 5)
