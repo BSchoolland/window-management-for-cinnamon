@@ -28,7 +28,7 @@ def ensure_workspace_exists(workspace_number):
         # If we need more workspaces, create them
         if workspace_number > current:
             run_command(f"gsettings set org.cinnamon.desktop.wm.preferences num-workspaces {workspace_number}")
-            time.sleep(1)  # Give the system time to create the workspaces
+            time.sleep(0.25)  # Give the system time to create the workspaces
             print(f"Created workspaces up to {workspace_number}")
         return True
     except Exception as e:
@@ -89,7 +89,6 @@ def close_windows_in_workspaces(start_ws=2, end_ws=5):
                     # Close the window gracefully
                     run_command(f"wmctrl -ic {window['id']}")
                     closed_count += 1
-                    time.sleep(0.2)  # Give the window time to close
                 except Exception as e:
                     print(f"Error closing window {window['id']}: {e}")
     
@@ -103,7 +102,7 @@ def wait_for_new_window(initial_windows, max_attempts=20):
             new_windows = current_windows - initial_windows
             if new_windows:
                 return new_windows
-            time.sleep(0.5)
+            time.sleep(0.2)
         except Exception as e:
             print(f"Error checking windows (attempt {attempt}): {e}")
     return set()
@@ -124,11 +123,11 @@ def move_window_to_workspace(window_id, workspace):
             
         # Activate the window first
         run_command(f"wmctrl -i -a {window_id}")
-        time.sleep(0.5)
+        time.sleep(0.2)
         
         # Move to workspace
         run_command(f"wmctrl -i -r {window_id} -t {workspace}")
-        time.sleep(0.5)
+        time.sleep(0.2)
         
         # Make maximized
         run_command(f"wmctrl -i -r {window_id} -b remove,fullscreen")  # Remove fullscreen if set
