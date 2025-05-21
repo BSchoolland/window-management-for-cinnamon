@@ -92,7 +92,7 @@ def select_localhost_option():
         elif key == '\x03':  # Ctrl+C
             raise KeyboardInterrupt
 
-def add_repo(url, chat_url=None, localhost_url=None):
+def add_repo(url, chat_url=None, localhost_url=None, given_path=None):
     """Clone a repository and add it to projects"""
     # Extract project name from URL
     project_name = url.split('/')[-1]
@@ -108,7 +108,7 @@ def add_repo(url, chat_url=None, localhost_url=None):
         return False
     
     # Check if project directory already exists directly in Projects directory
-    project_path = os.path.join(PROJECTS_DIR, project_name)
+    project_path = given_path or os.path.join(PROJECTS_DIR, project_name)
     
     # Check if project exists anywhere in the Projects directory structure
     found_project_path = None

@@ -110,7 +110,7 @@ def main():
             localhost_url = "http://localhost:3000"
             
             # Add repository (but don't clone since it already exists)
-            result = add_repo(git_url, args.chat_url, localhost_url)
+            result = add_repo(git_url, args.chat_url, localhost_url, repo_path)
             if result:
                 success_count += 1
             else:

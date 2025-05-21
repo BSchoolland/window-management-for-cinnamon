@@ -70,14 +70,14 @@ def check_workspaces_have_windows(start_ws=2, end_ws=5):
     has_windows = False
     window_count = 0
     
-    for ws in range(start_ws, end_ws + 1):
+    for ws in range(start_ws - 1, end_ws):
         if ws in windows_by_workspace and windows_by_workspace[ws]:
             has_windows = True
             window_count += len(windows_by_workspace[ws])
     
     return has_windows, window_count, windows_by_workspace
 
-def close_windows_in_workspaces(start_ws=2, end_ws=5):
+def close_windows_in_workspaces(start_ws=1, end_ws=4):
     """Close all windows in the specified workspace range"""
     windows_by_workspace = get_windows_by_workspace()
     
@@ -94,7 +94,7 @@ def close_windows_in_workspaces(start_ws=2, end_ws=5):
     
     return closed_count
 
-def wait_for_new_window(initial_windows, max_attempts=20):
+def wait_for_new_window(initial_windows, max_attempts=50):
     """Wait for a new window to appear, returns set of new window IDs"""
     for attempt in range(max_attempts):
         try:
@@ -105,6 +105,8 @@ def wait_for_new_window(initial_windows, max_attempts=20):
             time.sleep(0.2)
         except Exception as e:
             print(f"Error checking windows (attempt {attempt}): {e}")
+    # if no new windows are found, print a warning
+    print("Warning: No new windows found")
     return set()
 
 def get_window_id_number(window_id):
@@ -123,6 +125,8 @@ def move_window_to_workspace(window_id, workspace):
             
         # Activate the window first
         run_command(f"wmctrl -i -a {window_id}")
+        
+        # wait for the window to be found
         time.sleep(0.2)
         
         # Move to workspace
@@ -246,12 +250,12 @@ def open_project(project_data):
         if response.lower() != 'y' and response != '':
             print("Operation cancelled by user.")
             return False
-        # wait for 0.2 seconds for input to end
-        time.sleep(0.2)
-        run_command("xdotool key alt+F1")
         # Close windows in workspaces 2-5
-        closed = close_windows_in_workspaces(2, 5)
+        closed = close_windows_in_workspaces(1, 4) # 1-4 because index 0 is workspace 1
         print(f"Closed {closed} windows.")
+        time.sleep(1)
+    run_command("xdotool key alt+F1")
+
     # automatically press "alt-f1" to open workspace view
     # Get workspace configurations or use defaults
     config = project_data.get('workspace_config', {})
@@ -301,7 +305,6 @@ def open_project(project_data):
         if not run_and_move_window(chat_cmd, chat_ws):
             success = False
             print("Failed to open chat, continuing with other applications...")
-    run_command("xdotool key 2")
     return success
 
 if __name__ == "__main__":
