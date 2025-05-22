@@ -5,10 +5,24 @@ import sys
 import os
 import json
 import time
+import datetime
 from pathlib import Path
 
 PROJECTS_DIR = "/home/ben/Projects"
 DATA_FILE = os.path.join(PROJECTS_DIR, "projects.json")
+
+# Define colors for consistent usage
+COLORS = {
+    "in progress": "\033[1;32m",  # Bold Green
+    "completed": "\033[1;36m",    # Bold Cyan
+    "abandoned": "\033[1;31m",    # Bold Red
+    "prototype": "\033[1;33m",    # Bold Yellow
+    "other": "\033[1;35m",        # Bold Magenta
+    "not set": "\033[1;37m",      # Bold White
+    "RESET": "\033[0m",           # Reset
+    "HEADER": "\033[1;34m",       # Bold Blue for headers
+    "HIGHLIGHT": "\033[1;33;44m"  # Yellow text on blue background
+}
 
 def load_projects():
     """Load projects data from JSON file"""
@@ -277,5 +291,45 @@ def update_projects_by_status(filter_status=None):
         print(f"\n{COLORS['HEADER']}Successfully updated {updated} projects, skipped {skipped} projects.{COLORS['RESET']}")
     else:
         print(f"\n{COLORS['HEADER']}No changes made. Skipped all {skipped} projects.{COLORS['RESET']}")
+    
+    return True
+
+def display_project_info(project_name, project_data, title=None):
+    """Display a formatted info box with project details"""
+    # Get status with color
+    status = project_data.get('metadata', {}).get('status', 'Not set')
+    color = COLORS.get(status.lower(), COLORS["other"])
+    reset = COLORS["RESET"]
+    header = COLORS["HEADER"]
+    
+    # Format last accessed time
+    last_accessed = project_data.get('metadata', {}).get('last_accessed', 0)
+    if last_accessed:
+        last_accessed_str = datetime.datetime.fromtimestamp(last_accessed).strftime('%Y-%m-%d %H:%M:%S')
+    else:
+        last_accessed_str = "Never"
+    
+    # Use default title if none provided
+    if title is None:
+        title = "Project Information"
+    
+    # Create info box
+    width = 90
+    print(f"\n{header}{'╔' + '═' * (width - 2) + '╗'}{reset}")
+    print(f"{header}║{reset} {header}{title}{reset}{' ' * (width - len(title) - 3)}{header}║{reset}")
+    print(f"{header}╠{'═' * (width - 2)}╣{reset}")
+    print(f"{header}║{reset} Name:          {color}{project_name}{reset}{' ' * (width - 18 - len(project_name))}{header}║{reset}")
+    print(f"{header}║{reset} Status:        {color}{status}{reset}{' ' * (width - 18 - len(status))}{header}║{reset}")
+    print(f"{header}║{reset} Last Accessed: {last_accessed_str}{' ' * (width - 18 - len(last_accessed_str))}{header}║{reset}")
+    print(f"{header}║{reset} Path:          {project_data['path'][:width-18]}{' ' * max(0, width - 18 - len(project_data['path'][:width-18]))}{header}║{reset}")
+    
+    # Add GitHub URL if available
+    config = project_data.get('workspace_config', {})
+    github_url = config.get('github_url', project_data.get('url', ''))
+    if github_url:
+        github_display = github_url[:width-18]
+        print(f"{header}║{reset} GitHub:        {github_display}{' ' * max(0, width - 18 - len(github_display))}{header}║{reset}")
+    
+    print(f"{header}╚{'═' * (width - 2)}╝{reset}\n")
     
     return True

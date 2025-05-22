@@ -13,13 +13,13 @@ from add_repo import (
     get_git_remote_url, load_projects, save_projects, PROJECTS_DIR, DATA_FILE
 )
 import open_project
-from open_project import find_project, open_project
+from open_project import find_project, open_project, close_windows_in_workspaces, check_workspaces_have_windows
 import add_account
 from add_account import add_account_repos
 import edit_project
 from edit_project import (
     select_status_option, set_project_status, change_project_status, 
-    update_projects_by_status
+    update_projects_by_status, display_project_info, COLORS
 )
 
 def list_projects():
@@ -145,6 +145,7 @@ def main():
     parser.add_argument('--status', metavar='PROJECT', help='Change the status of a project')
     parser.add_argument('--bulk-update', metavar='STATUS', help='Bulk update projects with a specific status')
     parser.add_argument('--update-all', action='store_true', help='Update projects by status (interactive selection)')
+    parser.add_argument('--close', action='store_true', help='Close all windows in workspaces 2-5 and update recent project status')
     
     args = parser.parse_args()
     
@@ -342,6 +343,50 @@ def main():
         success = update_projects_by_status()
         return 0 if success else 1
     
+    # Handle --close
+    if args.close:
+        # Check for windows in workspaces 2-5
+        has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
+        
+        if has_windows:
+            print(f"Found {window_count} windows in workspaces 2-5.")
+            response = input("Close these windows? (y/Enter to confirm, any other key to cancel): ")
+            
+            if response.lower() == 'y' or response == '':
+                # Close windows in workspaces 2-5
+                closed = close_windows_in_workspaces(1, 4)  # 1-4 because index 0 is workspace 1
+                print(f"Closed {closed} windows.")
+                
+                # Find most recently accessed project
+                projects = load_projects()
+                most_recent = None
+                most_recent_time = 0
+                
+                for name, data in projects.items():
+                    last_accessed = data.get('metadata', {}).get('last_accessed', 0)
+                    if last_accessed > most_recent_time:
+                        most_recent = name
+                        most_recent_time = last_accessed
+                
+                if most_recent:
+                    # Display project info using the shared function
+                    display_project_info(most_recent, projects[most_recent], "Most Recently Opened Project")
+                    
+                    update = input("Update status? (y/n): ")
+                    if update.lower() == 'y':
+                        # Update the status
+                        success = change_project_status(most_recent, projects)
+                        if success:
+                            print(f"{COLORS['HEADER']}Status updated.{COLORS['RESET']}")
+                else:
+                    print("No projects found with access history.")
+            else:
+                print("Operation cancelled.")
+        else:
+            print("No windows found in workspaces 2-5.")
+        
+        return 0
+    
     # Handle opening a project by partial name
     if args.project:
         # Use find_project from open_project.py to find the project
@@ -353,7 +398,8 @@ def main():
         return 1
     
     # If no args, show usage
-    if not (args.list or args.add or args.all or args.project or args.account or args.delete or args.status or args.bulk_update or args.update_all):
+    if not (args.list or args.add or args.all or args.project or args.account or 
+            args.delete or args.status or args.bulk_update or args.update_all or args.close):
         parser.print_help()
         return 0
     
