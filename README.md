@@ -8,6 +8,7 @@ A command-line tool for managing your development projects. This tool provides e
 - Automatically set up workspaces with IDE, GitHub issues, localhost, and chat
 - Add Git repositories as projects
 - Automatically detect and add all Git repositories in your Projects directory
+- Add all repositories from a GitHub user account
 - List all available projects
 
 ## Installation
@@ -60,6 +61,32 @@ This will:
 - Scan your Projects directory for Git repositories
 - Add all found repositories to your projects list
 - Configure workspace settings for each
+
+### Add all repositories from a GitHub account
+```
+pj --account username
+```
+This will:
+- Fetch all repositories belonging to the specified GitHub user
+- Clone each repository
+- Add them to your projects list
+- Configure workspace settings for each
+
+### Delete a project
+```
+pj --delete project_name
+```
+This will:
+- Remove the project from the projects list
+- Keep the project files intact
+
+To also delete the project files:
+```
+pj --delete project_name --delete-files
+```
+This will:
+- Remove the project from the projects list
+- Delete the project directory and all its contents
 
 ### List all projects
 ```
