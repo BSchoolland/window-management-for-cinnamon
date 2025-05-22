@@ -231,6 +231,51 @@ def find_project(query):
         except ValueError:
             print("Please enter a valid number")
 
+def display_project_info(project_name, project_data):
+    """Display a formatted info box with project details"""
+    # Get status with color
+    status = project_data.get('metadata', {}).get('status', 'Not set')
+    status_colors = {
+        "in progress": "\033[1;32m",  # Bold Green
+        "completed": "\033[1;36m",    # Bold Cyan
+        "abandoned": "\033[1;31m",    # Bold Red
+        "prototype": "\033[1;33m",    # Bold Yellow
+        "other": "\033[1;35m",        # Bold Magenta
+        "Not set": "\033[1;37m",      # Bold White
+    }
+    color = status_colors.get(status, status_colors["other"])
+    reset = "\033[0m"
+    header = "\033[1;34m"  # Bold Blue for header
+    
+    # Format last accessed time
+    last_accessed = project_data.get('metadata', {}).get('last_accessed', 0)
+    if last_accessed:
+        import datetime
+        last_accessed_str = datetime.datetime.fromtimestamp(last_accessed).strftime('%Y-%m-%d %H:%M:%S')
+    else:
+        last_accessed_str = "Never"
+    
+    # Get workspace configs
+    config = project_data.get('workspace_config', {})
+    
+    # Create info box
+    width = 60
+    print(f"\n{header}{'╔' + '═' * (width - 2) + '╗'}{reset}")
+    print(f"{header}║{reset} {header}Project Information{reset}{' ' * (width - 22)}{header}║{reset}")
+    print(f"{header}╠{'═' * (width - 2)}╣{reset}")
+    print(f"{header}║{reset} Name:          {color}{project_name}{reset}{' ' * (width - 16 - len(project_name))}{header}║{reset}")
+    print(f"{header}║{reset} Status:        {color}{status}{reset}{' ' * (width - 16 - len(status))}{header}║{reset}")
+    print(f"{header}║{reset} Last Accessed: {last_accessed_str}{' ' * (width - 16 - len(last_accessed_str))}{header}║{reset}")
+    print(f"{header}║{reset} Path:          {project_data['path'][:width-18]}{' ' * max(0, width - 16 - len(project_data['path'][:width-18]))}{header}║{reset}")
+    
+    # Add GitHub URL if available
+    github_url = config.get('github_url', project_data.get('url', ''))
+    if github_url:
+        github_display = github_url[:width-18]
+        print(f"{header}║{reset} GitHub:        {github_display}{' ' * max(0, width - 16 - len(github_display))}{header}║{reset}")
+    
+    print(f"{header}╚{'═' * (width - 2)}╝{reset}\n")
+
 def open_project(project_data):
     """Open the selected project in configured applications and move to workspaces"""
     project_path = project_data['path']
@@ -239,10 +284,34 @@ def open_project(project_data):
         print(f"Error: Project directory not found: {project_path}")
         return False
     
+    # Get project name
+    projects = load_projects()
+    project_name = None
+    for name, data in projects.items():
+        if data['path'] == project_path:
+            project_name = name
+            break
+    
+    if project_name:
+        # Display project info box
+        display_project_info(project_name, project_data)
+        
+        # Update last accessed time
+        current_time = int(time.time())
+        if 'metadata' not in projects[project_name]:
+            projects[project_name]['metadata'] = {}
+        projects[project_name]['metadata']['last_accessed'] = current_time
+        
+        # Save updated project data
+        try:
+            with open(DATA_FILE, 'w') as f:
+                json.dump(projects, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Failed to update last accessed time: {e}")
+    
     # Check for existing windows in workspaces 2-5
     has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
     
-
     if has_windows:
         print(f"Found {window_count} windows in workspaces 2-5.")
         response = input("Close these windows and continue? (y/Enter to confirm, any other key to exit): ")

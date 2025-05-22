@@ -3,7 +3,35 @@
 
 import sys
 import os
+import json
+import time
 from pathlib import Path
+
+PROJECTS_DIR = "/home/ben/Projects"
+DATA_FILE = os.path.join(PROJECTS_DIR, "projects.json")
+
+def load_projects():
+    """Load projects data from JSON file"""
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(f"Error: {DATA_FILE} is corrupted")
+            return {}
+    else:
+        print(f"Warning: Projects data file not found at {DATA_FILE}")
+        return {}
+
+def save_projects(projects):
+    """Save projects data to JSON file"""
+    try:
+        with open(DATA_FILE, 'w') as f:
+            json.dump(projects, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving projects: {e}")
+        return False
 
 def get_key():
     """Get a single keypress from the user"""
@@ -76,11 +104,12 @@ def set_project_status(project_name, projects, status=None):
         projects[project_name]['metadata'] = {}
     
     projects[project_name]['metadata']['status'] = status
+    save_projects(projects)
     print(f"Status for '{project_name}' set to: {status}")
     
     return True
 
-def change_project_status(project_name, projects, save_projects_func):
+def change_project_status(project_name, projects, save_projects_func=None):
     """Change the status of an existing project"""
     if project_name not in projects:
         print(f"Error: Project '{project_name}' not found")
@@ -97,7 +126,13 @@ def change_project_status(project_name, projects, save_projects_func):
         projects[project_name]['metadata'] = {}
     
     projects[project_name]['metadata']['status'] = new_status
-    save_projects_func(projects)
+    
+    # Use our own save function if none provided
+    if save_projects_func is None:
+        save_projects(projects)
+    else:
+        save_projects_func(projects)
+        
     print(f"Status for '{project_name}' changed to: {new_status}")
     
     return True

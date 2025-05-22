@@ -20,17 +20,67 @@ import edit_project
 from edit_project import select_status_option, set_project_status, change_project_status
 
 def list_projects():
-    """List all projects"""
+    """List all projects with colored output, grouped by status"""
     projects = load_projects()
     
     if not projects:
         print("No projects found")
         return
     
-    print(f"Found {len(projects)} projects:")
-    for name, data in sorted(projects.items()):
+    # Define colors
+    COLORS = {
+        "in progress": "\033[1;32m",  # Bold Green
+        "completed": "\033[1;36m",    # Bold Cyan
+        "abandoned": "\033[1;31m",    # Bold Red
+        "prototype": "\033[1;33m",    # Bold Yellow
+        "other": "\033[1;35m",        # Bold Magenta
+        "Not set": "\033[1;37m",      # Bold White
+        "RESET": "\033[0m",           # Reset
+        "HEADER": "\033[1;34m"        # Bold Blue for headers
+    }
+    
+    # Group projects by status
+    status_groups = {}
+    for name, data in projects.items():
         status = data.get('metadata', {}).get('status', 'Not set')
-        print(f"  {name}: {data['path']} [Status: {status}]")
+        if status not in status_groups:
+            status_groups[status] = []
+        
+        # Add project with its last accessed time (default to 0 if not present)
+        last_accessed = data.get('metadata', {}).get('last_accessed', 0)
+        status_groups[status].append((name, last_accessed))
+    
+    # Sort statuses with "in progress" first, then by name
+    status_order = ["in progress", "prototype", "completed", "abandoned", "other", "Not set"]
+    def status_sort_key(status):
+        if status in status_order:
+            return status_order.index(status)
+        return len(status_order)
+    
+    sorted_statuses = sorted(status_groups.keys(), key=status_sort_key)
+    
+    print(f"{COLORS['HEADER']}Projects by Status:{COLORS['RESET']}")
+    total_count = 0
+    
+    # Print projects grouped by status and sorted by last accessed time
+    for status in sorted_statuses:
+        projects_in_status = status_groups[status]
+        if not projects_in_status:
+            continue
+            
+        # Sort projects by last accessed time (newest first)
+        projects_in_status.sort(key=lambda x: x[1], reverse=True)
+        
+        # Print status header with count
+        status_color = COLORS.get(status, COLORS["other"])
+        print(f"\n{status_color}{status.upper()} ({len(projects_in_status)}){COLORS['RESET']}")
+        
+        # Print projects in this status group
+        for i, (name, _) in enumerate(projects_in_status, 1):
+            print(f"  {i}. {status_color}{name}{COLORS['RESET']}")
+            total_count += 1
+    
+    print(f"\n{COLORS['HEADER']}Total: {total_count} projects{COLORS['RESET']}")
 
 def delete_project(project_name, delete_files=False):
     """Delete a project from the projects file and optionally delete its directory"""
@@ -272,7 +322,7 @@ def main():
                         print("Please enter a valid number")
         
         # Change the project status
-        success = change_project_status(project_name, projects, save_projects)
+        success = change_project_status(project_name, projects)
         return 0 if success else 1
     
     # Handle opening a project by partial name
