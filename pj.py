@@ -17,7 +17,10 @@ from open_project import find_project, open_project
 import add_account
 from add_account import add_account_repos
 import edit_project
-from edit_project import select_status_option, set_project_status, change_project_status
+from edit_project import (
+    select_status_option, set_project_status, change_project_status, 
+    update_projects_by_status
+)
 
 def list_projects():
     """List all projects with colored output, grouped by status"""
@@ -140,6 +143,8 @@ def main():
     parser.add_argument('--delete', metavar='PROJECT', help='Delete a project from the projects list')
     parser.add_argument('--delete-files', action='store_true', help='Also delete project files when deleting a project')
     parser.add_argument('--status', metavar='PROJECT', help='Change the status of a project')
+    parser.add_argument('--bulk-update', metavar='STATUS', help='Bulk update projects with a specific status')
+    parser.add_argument('--update-all', action='store_true', help='Update projects by status (interactive selection)')
     
     args = parser.parse_args()
     
@@ -325,6 +330,18 @@ def main():
         success = change_project_status(project_name, projects)
         return 0 if success else 1
     
+    # Handle --bulk-update STATUS
+    if args.bulk_update:
+        # Use the new update_projects_by_status function
+        success = update_projects_by_status(args.bulk_update)
+        return 0 if success else 1
+    
+    # Handle --update-all
+    if args.update_all:
+        # Use the new update_projects_by_status function with no status (will prompt)
+        success = update_projects_by_status()
+        return 0 if success else 1
+    
     # Handle opening a project by partial name
     if args.project:
         # Use find_project from open_project.py to find the project
@@ -336,7 +353,7 @@ def main():
         return 1
     
     # If no args, show usage
-    if not (args.list or args.add or args.all or args.project or args.account or args.delete or args.status):
+    if not (args.list or args.add or args.all or args.project or args.account or args.delete or args.status or args.bulk_update or args.update_all):
         parser.print_help()
         return 0
     
