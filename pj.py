@@ -16,6 +16,8 @@ import open_project
 from open_project import find_project, open_project
 import add_account
 from add_account import add_account_repos
+import edit_project
+from edit_project import select_status_option, set_project_status, change_project_status
 
 def list_projects():
     """List all projects"""
@@ -27,7 +29,8 @@ def list_projects():
     
     print(f"Found {len(projects)} projects:")
     for name, data in sorted(projects.items()):
-        print(f"  {name}: {data['path']}")
+        status = data.get('metadata', {}).get('status', 'Not set')
+        print(f"  {name}: {data['path']} [Status: {status}]")
 
 def delete_project(project_name, delete_files=False):
     """Delete a project from the projects file and optionally delete its directory"""
@@ -86,6 +89,7 @@ def main():
     parser.add_argument('--account', metavar='USERNAME', help='Add all repositories from a GitHub account')
     parser.add_argument('--delete', metavar='PROJECT', help='Delete a project from the projects list')
     parser.add_argument('--delete-files', action='store_true', help='Also delete project files when deleting a project')
+    parser.add_argument('--status', metavar='PROJECT', help='Change the status of a project')
     
     args = parser.parse_args()
     
@@ -102,16 +106,20 @@ def main():
         project_name = add_repo(args.add, args.chat_url, localhost_url)
         if not project_name:
             return 1
-            
+        projects = load_projects()
+
         if localhost_url is None:
             print("Select localhost URL option (use arrow keys and Enter):")
             localhost_url = select_localhost_option()
             
             # Update the project with the selected localhost URL
-            projects = load_projects()
             projects[project_name]['workspace_config']['localhost_url'] = localhost_url
             save_projects(projects)
-            
+        
+        # Add status to the project
+        print("Select status for this project (use arrow keys and Enter):")
+        set_project_status(project_name, projects)
+        save_projects(projects)
         return 0
     
     # Handle --account USERNAME
@@ -220,6 +228,53 @@ def main():
         success = delete_project(project_name, args.delete_files)
         return 0 if success else 1
     
+    # Handle --status PROJECT
+    if args.status:
+        # Find the exact project name if partial match
+        project_name = args.status
+        projects = load_projects()
+        
+        # Try exact match first
+        if project_name not in projects:
+            # Try partial match (case insensitive)
+            matches = []
+            query = project_name.lower()
+            for name in projects:
+                if query in name.lower():
+                    matches.append(name)
+            
+            if not matches:
+                print(f"No project matching '{project_name}' found")
+                return 1
+            
+            if len(matches) == 1:
+                project_name = matches[0]
+                print(f"Found project: {project_name}")
+            else:
+                # Multiple matches - let user choose
+                print("Multiple matching projects found:")
+                for i, name in enumerate(matches, 1):
+                    print(f"{i}. {name}")
+                
+                while True:
+                    try:
+                        choice = input("Enter number to select project (or 'q' to quit): ")
+                        if choice.lower() == 'q':
+                            return 0
+                        
+                        index = int(choice) - 1
+                        if 0 <= index < len(matches):
+                            project_name = matches[index]
+                            break
+                        else:
+                            print(f"Please enter a number between 1 and {len(matches)}")
+                    except ValueError:
+                        print("Please enter a valid number")
+        
+        # Change the project status
+        success = change_project_status(project_name, projects, save_projects)
+        return 0 if success else 1
+    
     # Handle opening a project by partial name
     if args.project:
         # Use find_project from open_project.py to find the project
@@ -231,7 +286,7 @@ def main():
         return 1
     
     # If no args, show usage
-    if not (args.list or args.add or args.all or args.project or args.account or args.delete):
+    if not (args.list or args.add or args.all or args.project or args.account or args.delete or args.status):
         parser.print_help()
         return 0
     

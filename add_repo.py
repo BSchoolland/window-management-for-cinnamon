@@ -176,7 +176,8 @@ def add_repo(url, chat_url=None, localhost_url=None, given_path=None):
             'chat_workspace': 5, # chatGPT folder or just chatGPT
             'github_url': github_url,
             'chat_url': chat_url
-        }
+        },
+        'status': 'unknown'
     }
     
     # Add localhost config only if a URL was provided
@@ -286,8 +287,8 @@ if __name__ == "__main__":
             localhost_url = "http://localhost:3000"
             
             # Add repository (but don't clone since it already exists)
-            result = add_repo(git_url, args.chat_url, localhost_url)
-            if result:
+            project_name = add_repo(git_url, args.chat_url, localhost_url)
+            if project_name:
                 success_count += 1
             else:
                 fail_count += 1
