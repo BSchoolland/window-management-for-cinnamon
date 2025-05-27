@@ -14,9 +14,7 @@ from add_repo import (
 )
 import open_project
 from open_project import find_project, open_project, close_windows_in_workspaces, check_workspaces_have_windows
-import add_account
 from add_account import add_account_repos
-import edit_project
 from edit_project import (
     select_status_option, set_project_status, change_project_status, 
     update_projects_by_status, display_project_info, COLORS
@@ -33,13 +31,15 @@ def list_projects():
     # Define colors
     COLORS = {
         "in progress": "\033[1;32m",  # Bold Green
-        "completed": "\033[1;36m",    # Bold Cyan
-        "abandoned": "\033[1;31m",    # Bold Red
-        "prototype": "\033[1;33m",    # Bold Yellow
-        "other": "\033[1;35m",        # Bold Magenta
-        "Not set": "\033[1;37m",      # Bold White
-        "RESET": "\033[0m",           # Reset
-        "HEADER": "\033[1;34m"        # Bold Blue for headers
+        "maintenance": "\033[1;36m",   # Bold Cyan
+        "near-completion": "\033[1;33m", # Bold Yellow
+        "completed": "\033[1;34m",     # Bold Blue
+        "abandoned": "\033[1;31m",     # Bold Red
+        "prototype": "\033[1;35m",     # Bold Magenta
+        "other": "\033[1;35m",         # Bold Magenta
+        "Not set": "\033[1;37m",       # Bold White
+        "RESET": "\033[0m",            # Reset
+        "HEADER": "\033[1;34m"         # Bold Blue for headers
     }
     
     # Group projects by status
@@ -54,7 +54,7 @@ def list_projects():
         status_groups[status].append((name, last_accessed))
     
     # Sort statuses with "in progress" first, then by name
-    status_order = ["in progress", "prototype", "completed", "abandoned", "other", "Not set"]
+    status_order = ["in progress", "near-completion", "maintenance", "prototype", "completed", "abandoned", "other", "Not set"]
     def status_sort_key(status):
         if status in status_order:
             return status_order.index(status)

@@ -14,12 +14,16 @@ echo "Copying scripts to installation directory..."
 sudo cp "$SCRIPT_DIR/pj.py" "$INSTALL_DIR/pj.py"
 sudo cp "$SCRIPT_DIR/add_repo.py" "$INSTALL_DIR/add_repo.py"
 sudo cp "$SCRIPT_DIR/open_project.py" "$INSTALL_DIR/open_project.py"
+sudo cp "$SCRIPT_DIR/add_account.py" "$INSTALL_DIR/add_account.py"
+sudo cp "$SCRIPT_DIR/edit_project.py" "$INSTALL_DIR/edit_project.py"
 
 # Make sure all Python files are executable
 echo "Setting permissions..."
 sudo chmod +x "$INSTALL_DIR/pj.py"
 sudo chmod +x "$INSTALL_DIR/add_repo.py" 
 sudo chmod +x "$INSTALL_DIR/open_project.py"
+sudo chmod +x "$INSTALL_DIR/add_account.py"
+sudo chmod +x "$INSTALL_DIR/edit_project.py"
 
 # Create a symbolic link to pj.py in /usr/local/bin/pj
 echo "Creating symbolic link in /usr/local/bin/pj..."

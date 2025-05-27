@@ -14,14 +14,16 @@ DATA_FILE = os.path.join(PROJECTS_DIR, "projects.json")
 # Define colors for consistent usage
 COLORS = {
     "in progress": "\033[1;32m",  # Bold Green
-    "completed": "\033[1;36m",    # Bold Cyan
-    "abandoned": "\033[1;31m",    # Bold Red
-    "prototype": "\033[1;33m",    # Bold Yellow
-    "other": "\033[1;35m",        # Bold Magenta
-    "not set": "\033[1;37m",      # Bold White
-    "RESET": "\033[0m",           # Reset
-    "HEADER": "\033[1;34m",       # Bold Blue for headers
-    "HIGHLIGHT": "\033[1;33;44m"  # Yellow text on blue background
+    "maintenance": "\033[1;36m",   # Bold Cyan
+    "near-completion": "\033[1;33m", # Bold Yellow
+    "completed": "\033[1;34m",     # Bold Blue
+    "abandoned": "\033[1;31m",     # Bold Red
+    "prototype": "\033[1;35m",     # Bold Magenta
+    "other": "\033[1;35m",         # Bold Magenta
+    "not set": "\033[1;37m",       # Bold White
+    "RESET": "\033[0m",            # Reset
+    "HEADER": "\033[1;34m",        # Bold Blue for headers
+    "HIGHLIGHT": "\033[1;33;44m"   # Yellow text on blue background
 }
 
 def load_projects():
@@ -62,7 +64,7 @@ def get_key():
 
 def select_status_option():
     """Interactive selector for project status options"""
-    options = ["in progress", "completed", "abandoned", "prototype", "other"]
+    options = ["in progress", "near-completion", "maintenance", "completed", "abandoned", "prototype", "other"]
     current = 0
     
     while True:
@@ -154,7 +156,7 @@ def change_project_status(project_name, projects, save_projects_func=None):
 def select_filter_status():
     """Let the user select which status to filter by"""
     # Define status options
-    options = ["in progress", "completed", "abandoned", "prototype", "other", "Not set"]
+    options = ["in progress", "near-completion", "maintenance", "completed", "abandoned", "prototype", "other", "Not set"]
     
     # Define colors
     COLORS = {
