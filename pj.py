@@ -4,6 +4,7 @@
 import argparse
 import sys
 import os
+import subprocess
 from pathlib import Path
 
 # Import functionality from existing scripts
@@ -13,7 +14,10 @@ from add_repo import (
     get_git_remote_url, load_projects, save_projects, PROJECTS_DIR, DATA_FILE
 )
 import open_project
-from open_project import find_project, open_project, close_windows_in_workspaces, check_workspaces_have_windows
+from open_project import (
+    find_project, open_project, close_windows_in_workspaces, 
+    check_workspaces_have_windows, run_command
+)
 from add_account import add_account_repos
 from edit_project import (
     select_status_option, set_project_status, change_project_status, 
@@ -139,6 +143,7 @@ def main():
     parser.add_argument('--localhost-url', help='URL for localhost (default: interactive selection)')
     parser.add_argument('--all', action='store_true', help='Add all git repositories in the Projects directory')
     parser.add_argument('--list', action='store_true', help='List all projects')
+    parser.add_argument('--quick', action='store_true', help='Open only the IDE in current workspace without closing other windows')
     parser.add_argument('--account', metavar='USERNAME', help='Add all repositories from a GitHub account')
     parser.add_argument('--delete', metavar='PROJECT', help='Delete a project from the projects list')
     parser.add_argument('--delete-files', action='store_true', help='Also delete project files when deleting a project')
@@ -392,9 +397,16 @@ def main():
         # Use find_project from open_project.py to find the project
         project_data = find_project(args.project)
         if project_data:
-            # Use open_project from open_project.py to open the project
-            success = open_project(project_data)
-            return 0 if success else 1
+            if args.quick:
+                # Quick mode - just open IDE in current workspace
+                print(f"Opening project in Cursor (quick mode)...")
+                cursor_cmd = f"nohup cursor {project_data['path']} > /dev/null 2>&1"
+                success = run_command(cursor_cmd)
+                return 0 if success else 1
+            else:
+                # Full mode - use open_project from open_project.py
+                success = open_project(project_data)
+                return 0 if success else 1
         return 1
     
     # If no args, show usage
