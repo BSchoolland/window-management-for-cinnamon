@@ -16,7 +16,7 @@ from add_repo import (
 import open_project
 from open_project import (
     find_project, open_project, close_windows_in_workspaces, 
-    check_workspaces_have_windows, run_command
+    check_workspaces_have_windows, run_command, swap_window_visibility_in_workspaces
 )
 from add_account import add_account_repos
 from edit_project import (
@@ -151,6 +151,7 @@ def main():
     parser.add_argument('--bulk-update', metavar='STATUS', help='Bulk update projects with a specific status')
     parser.add_argument('--update-all', action='store_true', help='Update projects by status (interactive selection)')
     parser.add_argument('--close', action='store_true', help='Close all windows in workspaces 2-5 and update recent project status')
+    parser.add_argument('--swap', action='store_true', help='Swap visibility of windows in workspaces 2-5 (minimize visible, restore minimized)')
     
     args = parser.parse_args()
     
@@ -392,6 +393,23 @@ def main():
         
         return 0
     
+    # Handle --swap
+    if args.swap:
+        # Check for windows in workspaces 2-5
+        has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
+        
+        if has_windows:
+            print(f"Found {window_count} windows in workspaces 2-5.")
+            print("Swapping window visibility (minimizing visible windows, restoring minimized windows)...")
+            
+            # Swap window visibility in workspaces 2-5
+            minimized, restored = swap_window_visibility_in_workspaces(1, 4)  # 1-4 because index 0 is workspace 1
+            print(f"Minimized {minimized} windows, restored {restored} windows.")
+        else:
+            print("No windows found in workspaces 2-5.")
+        
+        return 0
+    
     # Handle opening a project by partial name
     if args.project:
         # Use find_project from open_project.py to find the project
@@ -411,7 +429,7 @@ def main():
     
     # If no args, show usage
     if not (args.list or args.add or args.all or args.project or args.account or 
-            args.delete or args.status or args.bulk_update or args.update_all or args.close):
+            args.delete or args.status or args.bulk_update or args.update_all or args.close or args.swap):
         parser.print_help()
         return 0
     

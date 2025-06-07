@@ -102,6 +102,101 @@ def close_windows_in_workspaces(start_ws=1, end_ws=4):
     
     return closed_count
 
+def minimize_unminimized_windows_in_workspaces(start_ws=1, end_ws=4):
+    """Minimize all unminimized windows in the specified workspace range"""
+    windows_by_workspace = get_windows_by_workspace()
+    
+    minimized_count = 0
+    for ws in range(start_ws, end_ws + 1):
+        if ws in windows_by_workspace:
+            for window in windows_by_workspace[ws]:
+                try:
+                    # Use xdotool to minimize the window (more reliable than wmctrl)
+                    result = run_command(f"xdotool windowminimize {window['id']}")
+                    minimized_count += 1
+                    print(f"Minimized window: {window['title']}")
+                except Exception as e:
+                    print(f"Error minimizing window {window['id']}: {e}")
+    
+    return minimized_count
+
+def swap_window_visibility_in_workspaces(start_ws=1, end_ws=4):
+    """Swap the visibility state of windows in the specified workspace range"""
+    windows_by_workspace = get_windows_by_workspace()
+    
+    # Get current workspace to restore it later
+    try:
+        current_workspace = int(run_command("wmctrl -d | grep '*' | cut -d' ' -f1"))
+    except:
+        current_workspace = 0
+    
+    total_minimized = 0
+    total_restored = 0
+    
+    print("Swapping window visibility by workspace...")
+    
+    # Process each workspace separately
+    for ws in range(start_ws, end_ws + 1):
+        if ws not in windows_by_workspace or not windows_by_workspace[ws]:
+            continue
+            
+        workspace_windows = windows_by_workspace[ws]
+        print(f"\nProcessing workspace {ws + 1} ({len(workspace_windows)} windows)...")
+        
+        # Switch to this workspace
+        try:
+            run_command(f"wmctrl -s {ws}")
+            time.sleep(0.3)  # Give time for workspace switch
+        except Exception as e:
+            print(f"Error switching to workspace {ws + 1}: {e}")
+            continue
+        
+        # Now check and swap windows in this workspace
+        for window in workspace_windows:
+            try:
+                # Check if window is currently minimized by checking WM_STATE
+                wm_state_output = run_command(f"xprop -id {window['id']} WM_STATE")
+                
+                # Parse the WM_STATE output
+                is_minimized = False
+                if "WM_STATE" in wm_state_output:
+                    # Look for "Iconic" state - but only consider it minimized if we're on the right workspace
+                    if "Iconic" in wm_state_output:
+                        # Double-check by trying to see if window is actually visible
+                        # Use xwininfo to check if window is mapped and viewable
+                        wininfo = run_command(f"xwininfo -id {window['id']} | grep 'Map State'")
+                        if "IsUnmapped" in wininfo or "IsUnviewable" in wininfo:
+                            is_minimized = True
+                        # If it's on current workspace and shows Iconic, it's likely minimized
+                        elif "Iconic" in wm_state_output:
+                            is_minimized = True
+                
+                if is_minimized:
+                    # Window is minimized, restore it
+                    run_command(f"xdotool windowactivate {window['id']}")
+                    total_restored += 1
+                    print(f"  Restored: {window['title']}")
+                else:
+                    # Window is visible, minimize it
+                    run_command(f"xdotool windowminimize {window['id']}")
+                    total_minimized += 1
+                    print(f"  Minimized: {window['title']}")
+                
+                time.sleep(0.1)  # Small delay between operations
+                
+            except Exception as e:
+                print(f"  Error processing window {window['id']}: {e}")
+    
+    # Return to original workspace
+    try:
+        run_command(f"wmctrl -s {current_workspace}")
+        time.sleep(0.2)
+    except Exception as e:
+        print(f"Error returning to original workspace: {e}")
+    
+    print(f"\nCompleted: Minimized {total_minimized} windows, restored {total_restored} windows.")
+    return total_minimized, total_restored
+
 def wait_for_new_window(initial_windows, max_attempts=50):
     """Wait for a new window to appear, returns set of new window IDs"""
     for attempt in range(max_attempts):
@@ -239,7 +334,7 @@ def find_project(query):
         except ValueError:
             print("Please enter a valid number")
 
-def open_project(project_data):
+def open_project(project_data, close_windows=False):
     """Open the selected project in configured applications and move to workspaces"""
     project_path = project_data['path']
     
@@ -277,7 +372,7 @@ def open_project(project_data):
     # Check for existing windows in workspaces 2-5
     has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
     
-    if has_windows:
+    if has_windows and close_windows:
         print(f"Found {window_count} windows in workspaces 2-5.")
         response = input("Close these windows and continue? (y/Enter to confirm, any other key to exit): ")
         
@@ -288,8 +383,13 @@ def open_project(project_data):
         closed = close_windows_in_workspaces(1, 4) # 1-4 because index 0 is workspace 1
         print(f"Closed {closed} windows.")
         time.sleep(1)
-    run_command("xdotool key alt+F1")
-
+    elif has_windows and not close_windows:
+        # minimize the unminimized windows
+        print("Minimizing unminimized windows...")
+        minimized = minimize_unminimized_windows_in_workspaces(1, 4)
+        print(f"Minimized {minimized} windows.")
+        time.sleep(1)
+    
     # automatically press "alt-f1" to open workspace view
     # Get workspace configurations or use defaults
     config = project_data.get('workspace_config', {})
