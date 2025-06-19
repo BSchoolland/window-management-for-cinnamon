@@ -334,7 +334,7 @@ def find_project(query):
         except ValueError:
             print("Please enter a valid number")
 
-def open_project(project_data, close_windows=False):
+def open_project(project_data, close_windows=True, auto_accept=False):
     """Open the selected project in configured applications and move to workspaces"""
     project_path = project_data['path']
     
@@ -374,23 +374,24 @@ def open_project(project_data, close_windows=False):
     
     if has_windows and close_windows:
         print(f"Found {window_count} windows in workspaces 2-5.")
-        response = input("Close these windows and continue? (y/Enter to confirm, any other key to exit): ")
+        if auto_accept:
+            print("Auto-accepting window closure")
+            should_continue = True
+        else:
+            response = input("Close these windows and continue? (y/Enter to confirm, any other key to exit): ")
+            should_continue = response.lower() == 'y' or response == ''
         
-        if response.lower() != 'y' and response != '':
+        if not should_continue:
             print("Operation cancelled by user.")
             return False
         # Close windows in workspaces 2-5
         closed = close_windows_in_workspaces(1, 4) # 1-4 because index 0 is workspace 1
         print(f"Closed {closed} windows.")
         time.sleep(1)
-    elif has_windows and not close_windows:
-        # minimize the unminimized windows
-        print("Minimizing unminimized windows...")
-        minimized = minimize_unminimized_windows_in_workspaces(1, 4)
-        print(f"Minimized {minimized} windows.")
-        time.sleep(1)
     
     # automatically press "alt-f1" to open workspace view
+    run_command("xdotool key alt+F1")
+    time.sleep(0.2)
     # Get workspace configurations or use defaults
     config = project_data.get('workspace_config', {})
     cursor_ws = config.get('cursor_workspace', 1)

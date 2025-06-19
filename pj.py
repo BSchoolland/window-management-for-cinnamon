@@ -6,6 +6,7 @@ import sys
 import os
 import subprocess
 from pathlib import Path
+import time
 
 # Import functionality from existing scripts
 import add_repo
@@ -16,7 +17,8 @@ from add_repo import (
 import open_project
 from open_project import (
     find_project, open_project, close_windows_in_workspaces, 
-    check_workspaces_have_windows, run_command, swap_window_visibility_in_workspaces
+    check_workspaces_have_windows, run_command, swap_window_visibility_in_workspaces,
+    minimize_unminimized_windows_in_workspaces
 )
 from add_account import add_account_repos
 from edit_project import (
@@ -89,7 +91,7 @@ def list_projects():
     
     print(f"\n{COLORS['HEADER']}Total: {total_count} projects{COLORS['RESET']}")
 
-def delete_project(project_name, delete_files=False):
+def delete_project(project_name, delete_files=False, args=None):
     """Delete a project from the projects file and optionally delete its directory"""
     projects = load_projects()
     
@@ -104,10 +106,13 @@ def delete_project(project_name, delete_files=False):
     print(f"Path: {project_path}")
     
     if delete_files:
-        confirm = input(f"Are you sure you want to delete the project AND ITS FILES? (y/N): ")
-        if confirm.lower() != 'y':
-            print("Deletion cancelled")
-            return False
+        if args.yes:
+            print(f"Auto-accepting deletion of project AND ITS FILES: {project_name}")
+        else:
+            confirm = input(f"Are you sure you want to delete the project AND ITS FILES? (y/N): ")
+            if confirm.lower() != 'y':
+                print("Deletion cancelled")
+                return False
         
         # Delete project directory if requested
         try:
@@ -119,10 +124,13 @@ def delete_project(project_name, delete_files=False):
             print(f"Error deleting project directory: {e}")
             return False
     else:
-        confirm = input(f"Are you sure you want to remove this project from the projects list? (y/N): ")
-        if confirm.lower() != 'y':
-            print("Deletion cancelled")
-            return False
+        if args.yes:
+            print(f"Auto-accepting removal of project from list: {project_name}")
+        else:
+            confirm = input(f"Are you sure you want to remove this project from the projects list? (y/N): ")
+            if confirm.lower() != 'y':
+                print("Deletion cancelled")
+                return False
     
     # Remove from projects file
     del projects[project_name]
@@ -131,19 +139,75 @@ def delete_project(project_name, delete_files=False):
     
     return True
 
+def find_project_with_args(query, args):
+    """Find a project based on a partial name match, respecting -y flag"""
+    projects = load_projects()
+    
+    if not projects:
+        print("No projects found. Add a project first using add_repo.py")
+        return None
+    
+    # Try exact match first
+    if query in projects:
+        return projects[query]
+    
+    # Try partial match (case insensitive)
+    matches = []
+    query_lower = query.lower()
+    for name, data in projects.items():
+        if query_lower in name.lower():
+            matches.append((name, data))
+    
+    if not matches:
+        print(f"No project matching '{query}' found")
+        return None
+    
+    if len(matches) == 1:
+        name, data = matches[0]
+        print(f"Found project: {name}")
+        return data
+    
+    # Multiple matches - handle based on -y flag
+    if args.yes:
+        match_names = [name for name, _ in matches]
+        print(f"Error: Multiple projects match '{query}': {', '.join(match_names)}")
+        print("Use -y flag with a more specific project name to avoid ambiguity")
+        return None
+    
+    # Interactive selection
+    print("Multiple matching projects found:")
+    for i, (name, _) in enumerate(matches, 1):
+        print(f"{i}. {name}")
+    
+    while True:
+        try:
+            choice = input("Enter number to select project (or 'q' to quit): ")
+            if choice.lower() == 'q':
+                return None
+            
+            index = int(choice) - 1
+            if 0 <= index < len(matches):
+                name, data = matches[index]
+                return data
+            else:
+                print(f"Please enter a number between 1 and {len(matches)}")
+        except ValueError:
+            print("Please enter a valid number")
+
 def main():
     # Ensure projects directory exists
     if not os.path.exists(PROJECTS_DIR):
         os.makedirs(PROJECTS_DIR)
     
     parser = argparse.ArgumentParser(description='Project management tool')
-    parser.add_argument('project', nargs='?', help='Partial name of the project to open')
+    parser.add_argument('project', nargs='*', help='Name(s) or partial name(s) of project(s) to open. If multiple projects are specified, all but the last will be minimized.')
     parser.add_argument('--add', metavar='URL', help='Add a git repository as a project')
     parser.add_argument('--chat-url', help='URL for chat application (default: https://chat.com)')
     parser.add_argument('--localhost-url', help='URL for localhost (default: interactive selection)')
     parser.add_argument('--all', action='store_true', help='Add all git repositories in the Projects directory')
     parser.add_argument('--list', action='store_true', help='List all projects')
     parser.add_argument('--quick', action='store_true', help='Open only the IDE in current workspace without closing other windows')
+    parser.add_argument('-y', '--yes', action='store_true', help='Auto-accept prompts and return error for multiple matches instead of prompting')
     parser.add_argument('--account', metavar='USERNAME', help='Add all repositories from a GitHub account')
     parser.add_argument('--delete', metavar='PROJECT', help='Delete a project from the projects list')
     parser.add_argument('--delete-files', action='store_true', help='Also delete project files when deleting a project')
@@ -151,6 +215,7 @@ def main():
     parser.add_argument('--bulk-update', metavar='STATUS', help='Bulk update projects with a specific status')
     parser.add_argument('--update-all', action='store_true', help='Update projects by status (interactive selection)')
     parser.add_argument('--close', action='store_true', help='Close all windows in workspaces 2-5 and update recent project status')
+    parser.add_argument('--safe', action='store_true', help='Check if workspaces 2-5 have windows.  If no, open project normally.  If yes, open project in --quick mode')
     parser.add_argument('--swap', action='store_true', help='Swap visibility of windows in workspaces 2-5 (minimize visible, restore minimized)')
     
     args = parser.parse_args()
@@ -267,6 +332,11 @@ def main():
                 print(f"Found project: {project_name}")
             else:
                 # Multiple matches - let user choose
+                if args.yes:
+                    print(f"Error: Multiple projects match '{project_name}': {', '.join(matches)}")
+                    print("Use -y flag with a more specific project name to avoid ambiguity")
+                    return 1
+                
                 print("Multiple matching projects found:")
                 for i, name in enumerate(matches, 1):
                     print(f"{i}. {name}")
@@ -287,7 +357,7 @@ def main():
                         print("Please enter a valid number")
         
         # Delete the project
-        success = delete_project(project_name, args.delete_files)
+        success = delete_project(project_name, args.delete_files, args)
         return 0 if success else 1
     
     # Handle --status PROJECT
@@ -314,6 +384,11 @@ def main():
                 print(f"Found project: {project_name}")
             else:
                 # Multiple matches - let user choose
+                if args.yes:
+                    print(f"Error: Multiple projects match '{project_name}': {', '.join(matches)}")
+                    print("Use -y flag with a more specific project name to avoid ambiguity")
+                    return 1
+                
                 print("Multiple matching projects found:")
                 for i, name in enumerate(matches, 1):
                     print(f"{i}. {name}")
@@ -356,9 +431,14 @@ def main():
         
         if has_windows:
             print(f"Found {window_count} windows in workspaces 2-5.")
-            response = input("Close these windows? (y/Enter to confirm, any other key to cancel): ")
+            if args.yes:
+                print("Auto-accepting window closure")
+                should_close = True
+            else:
+                response = input("Close these windows? (y/Enter to confirm, any other key to cancel): ")
+                should_close = response.lower() == 'y' or response == ''
             
-            if response.lower() == 'y' or response == '':
+            if should_close:
                 # Close windows in workspaces 2-5
                 closed = close_windows_in_workspaces(1, 4)  # 1-4 because index 0 is workspace 1
                 print(f"Closed {closed} windows.")
@@ -378,8 +458,14 @@ def main():
                     # Display project info using the shared function
                     display_project_info(most_recent, projects[most_recent], "Most Recently Opened Project")
                     
-                    update = input("Update status? (y/n): ")
-                    if update.lower() == 'y':
+                    if args.yes:
+                        print("Auto-accepting status update")
+                        update_status = True
+                    else:
+                        update = input("Update status? (y/n): ")
+                        update_status = update.lower() == 'y'
+                    
+                    if update_status:
                         # Update the status
                         success = change_project_status(most_recent, projects)
                         if success:
@@ -412,20 +498,93 @@ def main():
     
     # Handle opening a project by partial name
     if args.project:
-        # Use find_project from open_project.py to find the project
-        project_data = find_project(args.project)
-        if project_data:
-            if args.quick:
-                # Quick mode - just open IDE in current workspace
-                print(f"Opening project in Cursor (quick mode)...")
-                cursor_cmd = f"nohup cursor {project_data['path']} > /dev/null 2>&1"
-                success = run_command(cursor_cmd)
-                return 0 if success else 1
+        # Handle multiple projects
+        if len(args.project) > 1:
+            print(f"Opening {len(args.project)} projects in sequence...")
+            
+            # Open projects in reverse order (last to first)
+            # This way the first project specified becomes the active one
+            for i, project_query in enumerate(reversed(args.project)):
+                project_index = len(args.project) - i
+                is_last_project = (i == len(args.project) - 1)  # Last in reverse order = first specified
+                
+                print(f"\n--- Opening project {project_index}/{len(args.project)}: {project_query} ---")
+                
+                # Find the project
+                project_data = find_project_with_args(project_query, args)
+                if not project_data:
+                    print(f"Skipping project '{project_query}' - not found")
+                    if args.yes:
+                        return 1  # Return error code when using -y flag
+                    continue
+                
+                if args.quick:
+                    # Quick mode - just open IDE in current workspace
+                    print(f"Opening project in Cursor (quick mode)...")
+                    cursor_cmd = f"nohup cursor {project_data['path']} > /dev/null 2>&1"
+                    run_command(cursor_cmd)
+                    return 0
+                else:
+                    # For multiple projects, minimize existing windows instead of closing them
+                    # Check for existing windows and minimize them
+                    has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
+                    if has_windows:
+                        print(f"Found {window_count} existing windows. Minimizing them...")
+                        minimized = minimize_unminimized_windows_in_workspaces(1, 4)
+                        print(f"Minimized {minimized} existing windows.")
+                        time.sleep(1)
+                    
+                    # Open project without closing windows (close_windows=False)
+                    success = open_project(project_data, close_windows=False, auto_accept=args.yes)
+                    if not success:
+                        print(f"Failed to open project '{project_query}'")
+                        continue
+                
+                # If this is not the last project to be processed (i.e., not the first one specified),
+                # minimize its windows so the final project (first specified) remains active
+                if not is_last_project and not args.quick:
+                    print(f"Minimizing windows for project '{project_query}' to prepare for next project...")
+                    time.sleep(2)  # Give time for windows to fully open
+                    minimized = minimize_unminimized_windows_in_workspaces(1, 4)
+                    print(f"Minimized {minimized} windows for '{project_query}'")
+                
+                # Small delay between projects
+                if not is_last_project:
+                    time.sleep(1)
+            
+            print(f"\nCompleted opening {len(args.project)} projects.")
+            return 0
+        
+        # Single project (original logic)
+        elif len(args.project) == 1:
+            project_data = find_project_with_args(args.project[0], args)
+            if project_data:
+                if args.quick:
+                    # Quick mode - just open IDE in current workspace
+                    print(f"Opening project in Cursor (quick mode)...")
+                    cursor_cmd = f"nohup cursor {project_data['path']} > /dev/null 2>&1"
+                    run_command(cursor_cmd)
+                    return 0
+                elif args.safe:
+                    # Safe mode - check for windows and decide mode accordingly
+                    has_windows, window_count, _ = check_workspaces_have_windows(2, 5)
+                    if has_windows:
+                        print(f"Found {window_count} windows in workspaces 2-5. Using quick mode to avoid disruption.")
+                        cursor_cmd = f"nohup cursor {project_data['path']} > /dev/null 2>&1"
+                        run_command(cursor_cmd)
+                        return 0
+                    else:
+                        print("No windows found in workspaces 2-5. Opening project normally.")
+                        success = open_project(project_data, close_windows=True, auto_accept=args.yes)
+                        return 0 if success else 1
+                else:
+                    # Full mode - use open_project from open_project.py
+                    success = open_project(project_data, close_windows=True, auto_accept=args.yes)
+                    return 0 if success else 1
             else:
-                # Full mode - use open_project from open_project.py
-                success = open_project(project_data)
-                return 0 if success else 1
-        return 1
+                if args.yes:
+                    print("Error: Project not found or multiple matches with -y flag")
+                return 1
     
     # If no args, show usage
     if not (args.list or args.add or args.all or args.project or args.account or 
